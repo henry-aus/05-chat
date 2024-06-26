@@ -4,7 +4,7 @@ use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
 
 #[derive(Debug, Clone, Default, ToSchema, Serialize, Deserialize)]
-pub struct CreateChat {
+pub struct ChatDTO {
     pub name: Option<String>,
     pub members: Vec<i64>,
     pub public: bool,
@@ -12,39 +12,10 @@ pub struct CreateChat {
 
 #[allow(dead_code)]
 impl AppState {
-    pub async fn create_chat(&self, input: CreateChat, ws_id: u64) -> Result<Chat, AppError> {
-        let len = input.members.len();
-        if len < 2 {
-            return Err(AppError::CreateChatError(
-                "Chat must have at least 2 members".to_string(),
-            ));
-        }
+    pub async fn create_chat(&self, input: ChatDTO, ws_id: u64) -> Result<Chat, AppError> {
+        let _ = self.valid_chat_dto(&input).await?;
 
-        if len > 8 && input.name.is_none() {
-            return Err(AppError::CreateChatError(
-                "Group chat with more than 8 members must have a name".to_string(),
-            ));
-        }
-
-        // verify if all members exist
-        let users = self.fetch_chat_user_by_ids(&input.members).await?;
-        if users.len() != len {
-            return Err(AppError::CreateChatError(
-                "Some members do not exist".to_string(),
-            ));
-        }
-
-        let chat_type = match (&input.name, len) {
-            (None, 2) => ChatType::Single,
-            (None, _) => ChatType::Group,
-            (Some(_), _) => {
-                if input.public {
-                    ChatType::PublicChannel
-                } else {
-                    ChatType::PrivateChannel
-                }
-            }
-        };
+        let chat_type = get_chat_type(&input);
         let chat = sqlx::query_as(
             r#"
             INSERT INTO chats (ws_id, name, type, members)
@@ -60,6 +31,62 @@ impl AppState {
         .await?;
 
         Ok(chat)
+    }
+
+    async fn valid_chat_dto(&self, input: &ChatDTO) -> Result<(), AppError> {
+        let len = input.members.len();
+        if len < 2 {
+            return Err(AppError::ChatDTOError(
+                "Chat must have at least 2 members".to_string(),
+            ));
+        }
+        if len > 8 && input.name.is_none() {
+            return Err(AppError::ChatDTOError(
+                "Group chat with more than 8 members must have a name".to_string(),
+            ));
+        }
+        let users = self.fetch_chat_user_by_ids(&input.members).await?;
+        if users.len() != len {
+            return Err(AppError::ChatDTOError(
+                "Some members do not exist".to_string(),
+            ));
+        }
+        Ok(())
+    }
+
+    pub async fn update_chat(&self, id: u64, input: ChatDTO) -> Result<Option<Chat>, AppError> {
+        let _ = self.valid_chat_dto(&input).await?;
+        let chat_type = get_chat_type(&input);
+        let chat = sqlx::query_as(
+            r#"
+            UPDATE chats SET name = $1, type = $2, members = $3
+            WHERE id = $4
+            RETURNING id, ws_id, name, type, members, created_at
+            "#,
+        )
+        .bind(input.name)
+        .bind(chat_type)
+        .bind(input.members)
+        .bind(id as i64)
+        .fetch_optional(&self.pool)
+        .await?;
+
+        Ok(chat)
+    }
+
+    pub async fn delete_chat(&self, id: u64) -> Result<Option<u64>, AppError> {
+        let chat_id: Option<(i64,)> = sqlx::query_as(
+            r#"
+            DELETE FROM chats 
+            WHERE id = $1
+            RETURNING id
+            "#,
+        )
+        .bind(id as i64)
+        .fetch_optional(&self.pool)
+        .await?;
+
+        Ok(chat_id.map(|r| r.0 as u64))
     }
 
     pub async fn fetch_chats(&self, ws_id: u64) -> Result<Vec<Chat>, AppError> {
@@ -109,8 +136,22 @@ impl AppState {
     }
 }
 
+fn get_chat_type(input: &ChatDTO) -> ChatType {
+    match (&input.name, &input.members.len()) {
+        (None, 2) => ChatType::Single,
+        (None, _) => ChatType::Group,
+        (Some(_), _) => {
+            if input.public {
+                ChatType::PublicChannel
+            } else {
+                ChatType::PrivateChannel
+            }
+        }
+    }
+}
+
 #[cfg(test)]
-impl CreateChat {
+impl ChatDTO {
     pub fn new(name: &str, members: &[i64], public: bool) -> Self {
         let name = if name.is_empty() {
             None
@@ -133,7 +174,7 @@ mod tests {
     #[tokio::test]
     async fn create_single_chat_should_work() -> Result<()> {
         let (_tdb, state) = AppState::new_for_test().await?;
-        let input = CreateChat::new("", &[1, 2], false);
+        let input = ChatDTO::new("", &[1, 2], false);
         let chat = state
             .create_chat(input, 1)
             .await
@@ -147,7 +188,7 @@ mod tests {
     #[tokio::test]
     async fn create_public_named_chat_should_work() -> Result<()> {
         let (_tdb, state) = AppState::new_for_test().await?;
-        let input = CreateChat::new("general", &[1, 2, 3], true);
+        let input = ChatDTO::new("general", &[1, 2, 3], true);
         let chat = state
             .create_chat(input, 1)
             .await
