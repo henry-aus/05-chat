@@ -57,7 +57,7 @@ Authorization: Bearer {{token}}
 }
 
 ### update chat
-PATCH http://localhost:6688/api/chats/1
+PATCH http://localhost:6688/api/chats/9
 Content-Type: application/json
 Authorization: Bearer {{token}}
 

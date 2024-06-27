@@ -53,6 +53,7 @@ pub(crate) async fn sse_handler(
         let name = match v.as_ref() {
             AppEvent::NewChat(_) => "NewChat",
             AppEvent::AddToChat(_) => "AddToChat",
+            AppEvent::UpdateChatName(_) => "UpdateChatName",
             AppEvent::RemoveFromChat(_) => "RemoveFromChat",
             AppEvent::NewMessage(_) => "NewMessage",
         };

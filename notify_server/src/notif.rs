@@ -12,6 +12,7 @@ use tracing::{info, warn};
 pub enum AppEvent {
     NewChat(Chat),
     AddToChat(Chat),
+    UpdateChatName(Chat),
     RemoveFromChat(Chat),
     NewMessage(Message),
 }
@@ -79,7 +80,15 @@ impl Notification {
                     get_affected_chat_user_ids(payload.old.as_ref(), payload.new.as_ref());
                 let event = match payload.op.as_str() {
                     "INSERT" => AppEvent::NewChat(payload.new.expect("new should exist")),
-                    "UPDATE" => AppEvent::AddToChat(payload.new.expect("new should exist")),
+                    "UPDATE" => {
+                        let new_chat = payload.new.expect("new should exist");
+                        match payload.old {
+                            Some(old_chat) if old_chat.name != new_chat.name => {
+                                AppEvent::UpdateChatName(new_chat)
+                            }
+                            _ => AppEvent::AddToChat(new_chat),
+                        }
+                    }
                     "DELETE" => AppEvent::RemoveFromChat(payload.old.expect("old should exist")),
                     _ => return Err(anyhow::anyhow!("Invalid operation")),
                 };
@@ -107,7 +116,7 @@ fn get_affected_chat_user_ids(old: Option<&Chat>, new: Option<&Chat>) -> HashSet
             // diff old/new members, if identical, no need to notify, otherwise notify the union of both
             let old_user_ids: HashSet<_> = old.members.iter().map(|v| *v as u64).collect();
             let new_user_ids: HashSet<_> = new.members.iter().map(|v| *v as u64).collect();
-            if old_user_ids == new_user_ids {
+            if old_user_ids == new_user_ids && old.name == new.name {
                 HashSet::new()
             } else {
                 old_user_ids.union(&new_user_ids).copied().collect()
