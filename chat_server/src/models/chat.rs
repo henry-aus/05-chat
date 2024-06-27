@@ -13,8 +13,7 @@ pub struct ChatDTO {
 #[allow(dead_code)]
 impl AppState {
     pub async fn create_chat(&self, input: ChatDTO, ws_id: u64) -> Result<Chat, AppError> {
-        let _ = self.valid_chat_dto(&input).await?;
-
+        self.valid_chat_dto(&input).await?;
         let chat_type = get_chat_type(&input);
         let chat = sqlx::query_as(
             r#"
@@ -55,7 +54,7 @@ impl AppState {
     }
 
     pub async fn update_chat(&self, id: u64, input: ChatDTO) -> Result<Option<Chat>, AppError> {
-        let _ = self.valid_chat_dto(&input).await?;
+        self.valid_chat_dto(&input).await?;
         let chat_type = get_chat_type(&input);
         let chat = sqlx::query_as(
             r#"
@@ -77,7 +76,7 @@ impl AppState {
     pub async fn delete_chat(&self, id: u64) -> Result<Option<u64>, AppError> {
         let chat_id: Option<(i64,)> = sqlx::query_as(
             r#"
-            DELETE FROM chats 
+            DELETE FROM chats
             WHERE id = $1
             RETURNING id
             "#,

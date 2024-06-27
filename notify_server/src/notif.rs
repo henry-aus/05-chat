@@ -54,7 +54,11 @@ pub async fn setup_pg_listener(state: AppState) -> anyhow::Result<()> {
                 if let Some(tx) = users.get(&user_id) {
                     info!("Sending notification to user {}", user_id);
                     if let Err(e) = tx.send(notification.event.clone()) {
-                        warn!("Failed to send notification to user {}: {}", user_id, e);
+                        warn!(
+                            "Failed to send notification to user {}: {}, remove from users",
+                            user_id, e
+                        );
+                        users.remove(&user_id);
                     }
                 }
             }

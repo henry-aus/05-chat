@@ -13,12 +13,32 @@ use tracing::info;
 
 const CHANNEL_CAPACITY: usize = 256;
 
+/// not working to detect the channel closed.
+// struct Guard {
+//     user_id: u64,
+//     user_map: UserMap,
+// }
+
+// impl Guard {
+//     fn new(user_id: u64, user_map: UserMap) -> Guard {
+//         Guard { user_id, user_map }
+//     }
+// }
+
+// impl Drop for Guard {
+//     fn drop(&mut self) {
+//         //self.user_map.remove(&self.user_id);
+//     }
+// }
+
 pub(crate) async fn sse_handler(
     Extension(user): Extension<User>,
     State(state): State<AppState>,
 ) -> Sse<impl Stream<Item = Result<Event, Infallible>>> {
     let user_id = user.id as u64;
     let users = &state.users;
+
+    //let _guard = Guard::new(user_id, users.clone());
 
     let rx = if let Some(tx) = users.get(&user_id) {
         tx.subscribe()

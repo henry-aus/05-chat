@@ -50,7 +50,7 @@ async fn chat_server_should_work() -> Result<()> {
     NotifyServer::new(&db_url, &chat_server.token).await?;
     let chat = chat_server.create_chat().await?;
     let _msg = chat_server.create_message(chat.id as u64).await?;
-    sleep(Duration::from_secs(1)).await;
+    sleep(Duration::from_secs(10)).await;
     Ok(())
 }
 
@@ -115,6 +115,8 @@ impl ChatServer {
                 .await
                 .unwrap();
         });
+
+        sleep(Duration::from_secs(5)).await;
 
         let client = reqwest::Client::new();
 
