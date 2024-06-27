@@ -16,7 +16,8 @@ pub struct AuthOutput {
     path = "/api/signup",
     responses(
         (status = 200, description = "User created", body = AuthOutput),
-    )
+    ),
+    tag = "user"
 )]
 /// Create a new user in the chat system with email and password.
 ///
@@ -38,7 +39,8 @@ pub(crate) async fn signup_handler(
     path = "/api/signin",
     responses(
         (status = 200, description = "User signed in", body = AuthOutput),
-    )
+    ),
+    tag = "user"
 )]
 pub(crate) async fn signin_handler(
     State(state): State<AppState>,

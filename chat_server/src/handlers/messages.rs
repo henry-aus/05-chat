@@ -4,12 +4,36 @@ use axum::{
     response::IntoResponse,
     Extension, Json,
 };
+
 use tokio::fs;
 use tracing::{info, warn};
+use utoipa::ToSchema;
 
 use crate::{AppError, AppState, ChatFile, CreateMessage, ListMessages};
 use chat_core::User;
 
+#[derive(ToSchema)]
+#[allow(unused)]
+pub struct UploadFile {
+    file: Vec<u8>,
+}
+
+#[utoipa::path(
+    post,
+    path = "/api/chats/{id}/messages",
+    params(
+        ("id" = u64, Path, description = "Chat id"),
+    ),
+    request_body = CreateMessage,
+    responses(
+        (status = 201, description = "New message", body = Message),
+        (status = 400, description = "Invalid input", body = ErrorOutput),
+    ),
+    security(
+        ("token" = [])
+    ),
+    tag = "message"
+)]
 pub(crate) async fn send_message_handler(
     Extension(user): Extension<User>,
     State(state): State<AppState>,
@@ -35,7 +59,8 @@ pub(crate) async fn send_message_handler(
     ),
     security(
         ("token" = [])
-    )
+    ),
+    tag = "message"
 )]
 pub(crate) async fn list_message_handler(
     State(state): State<AppState>,
@@ -46,6 +71,24 @@ pub(crate) async fn list_message_handler(
     Ok(Json(messages))
 }
 
+//.route("/upload", post(upload_handler))
+
+#[utoipa::path(
+    get,
+    path = "/api/files/{ws_id}/{path}",
+    params(
+        ("ws_id" = u64, Path, description = "workspace id"),
+        ("path" = String, Path, description = "relative path of the file")
+    ),
+    responses(
+        (status = 200, description = "Content of file", body = Vec<u8>),
+        (status = 400, description = "Invalid input", body = ErrorOutput),
+    ),
+    security(
+        ("token" = [])
+    ),
+    tag = "message"
+)]
 pub(crate) async fn file_handler(
     Extension(user): Extension<User>,
     State(state): State<AppState>,
@@ -70,6 +113,22 @@ pub(crate) async fn file_handler(
     Ok((headers, body))
 }
 
+#[utoipa::path(
+    post,
+    path = "/api/upload",
+    request_body(
+        content_type = "multipart/form-data",
+        content = UploadFile
+    ),
+    responses(
+        (status = 200, description = "A list of file relative path", body = Vec<String>),
+        (status = 400, description = "Invalid input", body = ErrorOutput),
+    ),
+    security(
+        ("token" = [])
+    ),
+    tag = "message"
+)]
 pub(crate) async fn upload_handler(
     Extension(user): Extension<User>,
     State(state): State<AppState>,
